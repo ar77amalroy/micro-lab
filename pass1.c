@@ -1,78 +1,127 @@
-#include<stdio.h>
-#include<string.h>
-#include<stdlib.h>
-int main(){
-	char label[10], opcode[10], operand[10], code[10], mnemonic[10];
-	int locctr, start = 0, length;
-	FILE *fp1, *fp2, *fp3, *fp4;
-    	fp1 = fopen("input.txt","r");
-    	fp2 = fopen("optab.txt","r");
-    	fp3 = fopen("symtab.txt","w");
-    	fp4 = fopen("inter.txt","w");
-    	if (fp1 == NULL || fp2 == NULL || fp3 == NULL || fp4 == NULL) {
-        	printf("Error opening files.\n");
-        	return 1;
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main() {
+    char opcode[10], operand[10], label[10], mnemonic[10], code[10];
+    int locctr, start, length;
+    char ch;
+
+    FILE *input, *optab, *symbol, *output;
+
+    input = fopen("input.txt", "r");
+    optab = fopen("optab.txt", "r");
+    symbol = fopen("symtab.txt", "w");
+    output = fopen("output.txt", "w");
+
+    if (!input) {
+        printf("Error: Could not open input.txt\n");
     }
-    	fscanf(fp1,"%s\t%s\t%s", label,opcode,operand);
-    	if(strcmp(opcode,"START") == 0){
-    		start = atoi(operand);
-    		locctr = start;
-    		fprintf(fp4,"\t%s\t%s\t%s\n", label,opcode,operand);
-    		fscanf(fp1,"%s\t%s\t%s", label,opcode,operand);
-    	}else{
-    	locctr = 0;
+    if (!optab) {
+        printf("Error: Could not open optab.txt\n");
     }
-    while(strcmp(opcode,"END") != 0){	
-    	fprintf(fp4,"%d\t",locctr);
-    	if((strcmp(label,"**") != 0) && (strcmp(opcode,"RESW") != 0) && (strcmp(opcode,"RESW") != 0)){
-    		fprintf(fp3,"%s\t%d\n",label,locctr);
-    	}
-    	int found = 0;
-    	rewind(fp2);
-    	while(fscanf(fp2,"%s\t%s",code,mnemonic) != EOF){
-    		if(strcmp(code,opcode) == 0){
-    			found = 1;
-    			locctr += 3;
-    			break;
-    		}
-    	}
-    	if(!found){
-    		if(strcmp(opcode,"WORD") == 0){
-    			locctr += 3;
-    		}else if(strcmp(opcode,"RESW") == 0){
-    			locctr += 3*atoi(operand);
-    		}else if(strcmp(opcode,"RESB") == 0){
-    			locctr += atoi(operand);
-    		}else if(strcmp(opcode,"BYTE") == 0){
-		    if (operand[0] == 'C') {
-			locctr += strlen(operand) - 3;
-		    } else if (operand[0] == 'X') {
-			locctr += (strlen(operand) - 3) / 2;
-		    }
-		}
-    	}
-    	fprintf(fp4,"%s\t%s\t%s\n",label,opcode,operand);
-    	fscanf(fp1,"%s\t%s\t%s", label,opcode,operand);
+    if (!symbol) {
+        printf("Error: Could not open symtab.txt\n");
     }
-    	fprintf(fp4,"%d\t%s\t%s\t%s",locctr,label,opcode,operand);
-    	length = locctr - start;
-    	printf("length of the code: %d\n",length);
-    	fclose(fp1);
-    	fclose(fp2);
-    	fclose(fp3);
-    	fclose(fp4);    
-    	printf("\nContents of inter.txt:\n");
-    	FILE *finter = fopen("inter.txt", "r");
-    	char ch;
-    	while ((ch = fgetc(finter)) != EOF) {
-    	    printf("%c", ch);
-    	}
-    	fclose(finter);
-	printf("\n\nContents of symtab.txt:\n");
-    	FILE *fsymtab = fopen("symtab.txt", "r");
-    	while ((ch = fgetc(fsymtab)) != EOF) {
+    if (!output) {
+        printf("Error: Could not open output.txt\n");
+    }
+    if (!input || !optab || !symbol || !output) {
+        return 1;
+    }
+
+    if (fscanf(input, "%s\t%s\t%s", label, opcode, operand) == EOF) {
+        printf("Error: input.txt is empty.\n");
+        return 1;
+    }
+
+    if (strcmp(opcode, "START") == 0) {
+        start = (int)strtol(operand, NULL, 16);
+        locctr = start;
+        fprintf(output, "\t%s\t%s\t%s\n", label, opcode, operand);
+        if (fscanf(input, "%s\t%s\t%s", label, opcode, operand) == EOF) {
+            printf("Error: No instructions after START.\n");
+            return 1;
+        }
+    } else {
+        locctr = 0;
+    }
+
+    while (strcmp(opcode, "END") != 0) {
+        fprintf(output, "%04X\t", locctr);
+
+        if (strcmp(label, "-") != 0) {
+            fprintf(symbol, "%s\t%04X\n", label, locctr);
+        }
+
+        rewind(optab);
+        int found = 0;
+        while (fscanf(optab, "%s\t%s", code, mnemonic) != EOF) {
+            if (strcmp(opcode, code) == 0) {
+                locctr += 3;
+                found = 1;
+                break;
+            }
+        }
+
+        if (!found) {
+            if (strcmp(opcode, "WORD") == 0) {
+                locctr += 3;
+            } else if (strcmp(opcode, "RESW") == 0) {
+                locctr += 3 * atoi(operand);
+            } else if (strcmp(opcode, "RESB") == 0) {
+                locctr += atoi(operand);
+            } else if (strcmp(opcode, "BYTE") == 0) {
+                if (operand[0] == 'C') {
+                    locctr += strlen(operand) - 3;
+                } else if (operand[0] == 'X') {
+                    locctr += (strlen(operand) - 3) / 2;
+                }
+            }
+        }
+
+        fprintf(output, "%s\t%s\t%s\n", label, opcode, operand);
+
+        if (fscanf(input, "%s\t%s\t%s", label, opcode, operand) == EOF) {
+            break;
+        }
+    }
+
+    fprintf(output, "\t%s\t%s\t%s\n", label, opcode, operand);
+
+    length = locctr - start;
+    printf("The length of code: %d\n", length);
+
+    fclose(input);
+    fclose(optab);
+    fclose(symbol);
+    fclose(output);
+
+    output = fopen("output.txt", "r");
+    if (!output) {
+        printf("Error: Could not reopen output.txt for reading.\n");
+        return 1;
+    }
+
+    printf("\n\nContents of output.txt:\n");
+    char line[100];
+    while (fgets(line, sizeof(line), output)) {
+        printf("%s", line);
+    }
+    fclose(output);
+
+    FILE *fsymtab = fopen("symtab.txt", "r");
+    if (!fsymtab) {
+        printf("Error: Could not open symtab.txt\n");
+        return 1;
+    }
+
+    printf("\n\nContents of symtab.txt:\n");
+    while ((ch = fgetc(fsymtab)) != EOF) {
         printf("%c", ch);
-    	}
-    	fclose(fsymtab);
-    	return 0;
+    }
+    fclose(fsymtab);
+
+    return 0;
 }
+
